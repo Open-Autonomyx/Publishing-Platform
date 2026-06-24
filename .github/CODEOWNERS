@@ -1,0 +1,31 @@
+# Code ownership rules for Universal Creative Platform
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - require review for any changes
+* @fractional-pm
+
+# API server
+/src/api/ @fractional-pm
+
+# Agents
+/src/agents/ @fractional-pm
+
+# Database schema and migrations
+/db/ @fractional-pm
+
+# Infrastructure and deployment
+/infra/ @fractional-pm
+/k8s/ @fractional-pm
+
+# Monitoring and observability
+/monitoring/ @fractional-pm
+
+# CI/CD pipelines
+/.github/workflows/ @fractional-pm
+
+# Web dashboard
+/src/web/ @fractional-pm
+
+# Documentation
+/docs/ @fractional-pm
+*.md @fractional-pm

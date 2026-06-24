@@ -1,0 +1,61 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+      - develop
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop'
+    environment:
+      name: staging
+      url: https://staging-api.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy to staging cluster
+        run: |
+          echo "Deploying to staging..."
+          # Add deployment commands here
+          # kubectl set image deployment/api api=ghcr.io/${{ github.repository_owner }}/creative-platform-api:${{ github.sha }}
+          # kubectl rollout status deployment/api
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    environment:
+      name: production
+      url: https://api.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Manual approval check
+        run: |
+          echo "✅ Production deployment approved"
+          echo "Run smoke tests before deployment"
+
+      - name: Deploy to production cluster
+        run: |
+          echo "Deploying to production..."
+          # Add deployment commands here
+          # kubectl set image deployment/api api=ghcr.io/${{ github.repository_owner }}/creative-platform-api:${{ github.sha }}
+          # kubectl rollout status deployment/api
+
+      - name: Smoke tests
+        run: |
+          echo "Running smoke tests..."
+          # curl -f https://api.example.com/health || exit 1

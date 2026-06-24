@@ -1,0 +1,133 @@
+# Go
+*.o
+*.a
+*.so
+.DS_Store
+bin/
+dist/
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.cover
+coverage.out
+coverage.html
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+.netrwhist
+.DS_Store
+
+# Testing
+test.log
+*.pem
+*.key
+
+# Docker
+docker-compose.override.yml
+
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/.terraform/**
+**/*.tfstate
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Node / Web
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Secrets
+.env*
+!.env.example
+*.key
+*.pem
+secrets/
+private/
+local.env
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+bin/
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+.#*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+
+# Logs
+*.log
+logs/
