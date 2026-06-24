@@ -1,0 +1,98 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: creative-platform-db
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: creative_platform
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d creative_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - creative-platform
+
+  api:
+    build:
+      context: src/api
+      dockerfile: Dockerfile
+    container_name: creative-platform-api
+    environment:
+      DATABASE_URL: postgresql://dev:dev@postgres:5432/creative_platform
+      API_PORT: 3001
+      API_ENV: development
+      JWT_SECRET: dev-secret-key-change-in-prod
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src/api:/app:cached
+    networks:
+      - creative-platform
+    command: go run .
+
+  redis:
+    image: redis:7-alpine
+    container_name: creative-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - creative-platform
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: creative-platform-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - creative-platform
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: creative-platform-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - creative-platform
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  creative-platform:
+    driver: bridge
