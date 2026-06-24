@@ -60,7 +60,7 @@ echo -e "${YELLOW}Step 2: Installing system dependencies...${NC}"
 run_on_vps "sudo bash -c '
 set -e
 dnf update -y
-dnf install -y curl wget git htop docker sshpass openssl
+dnf install -y curl wget git htop docker sshpass openssl nginx certbot python3-certbot-nginx
 systemctl start docker
 systemctl enable docker
 curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose
@@ -75,6 +75,35 @@ docker network create creative-network 2>/dev/null || true
 echo \"Done\"
 '"
 echo -e "${GREEN}✅ Dependencies installed${NC}"
+echo ""
+
+echo -e "${YELLOW}Step 2b: Setting up cert-manager for SSL/TLS...${NC}"
+run_on_vps "
+# Create cert-manager directory
+sudo mkdir -p /etc/cert-manager/renewals
+sudo chmod 755 /etc/cert-manager/renewals
+
+# Setup automatic SSL renewal via certbot
+sudo bash -c 'cat > /etc/systemd/system/certbot-renew.timer << \"TIMER\"
+[Unit]
+Description=Certbot renewal timer
+After=network.target
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=12h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+systemctl daemon-reload
+systemctl enable certbot-renew.timer
+systemctl start certbot-renew.timer
+echo \"Cert-manager renewal scheduled\"'
+"
+echo -e "${GREEN}✅ cert-manager configured for automatic SSL renewal${NC}"
 echo ""
 
 echo -e "${YELLOW}Step 3: Cloning repository...${NC}"
@@ -201,7 +230,7 @@ echo 'API started'
 echo -e "${GREEN}✅ API running${NC}"
 echo ""
 
-echo -e "${YELLOW}Step 11: Configuring Nginx reverse proxy...${NC}"
+echo -e "${YELLOW}Step 11: Configuring Nginx reverse proxy with cert-manager SSL...${NC}"
 run_on_vps "
 sudo bash -c 'cat > /etc/nginx/conf.d/creative-platform.conf << \"NGINX_EOF\"
 upstream api_backend {
@@ -212,9 +241,22 @@ upstream liferay_backend {
     server localhost:8080;
 }
 
+# PII Protection Headers
+add_header X-Content-Type-Options \"nosniff\" always;
+add_header X-Frame-Options \"SAMEORIGIN\" always;
+add_header X-XSS-Protection \"1; mode=block\" always;
+add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
+add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'\" always;
+
 server {
     listen 80;
     server_name agennext.com www.agennext.com;
+
+    # Certbot challenge for renewal
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
 
     # Redirect HTTP to HTTPS
     return 301 https://\$server_name\$request_uri;
@@ -224,10 +266,30 @@ server {
     listen 443 ssl http2;
     server_name agennext.com www.agennext.com;
 
+    # cert-manager SSL certificates
     ssl_certificate /etc/letsencrypt/live/agennext.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/agennext.com/privkey.pem;
+
+    # Strong SSL configuration
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # PII Protection Headers
+    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
+    add_header X-Content-Type-Options \"nosniff\" always;
+    add_header X-Frame-Options \"SAMEORIGIN\" always;
+    add_header X-XSS-Protection \"1; mode=block\" always;
+    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+
+    # Disable client-side caching of sensitive responses
+    location ~ ^/(api/|admin/) {
+        add_header Cache-Control \"no-store, no-cache, must-revalidate, max-age=0\" always;
+        add_header Pragma \"no-cache\" always;
+        add_header Expires \"0\" always;
+    }
 
     # API endpoints
     location /api/ {
@@ -236,6 +298,7 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$server_name;
     }
 
     # Health check
@@ -244,8 +307,11 @@ server {
         proxy_set_header Host \$host;
     }
 
-    # Metrics
+    # Metrics (restricted to localhost)
     location /metrics {
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
         proxy_pass http://api_backend;
         proxy_set_header Host \$host;
     }
@@ -258,6 +324,13 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
+
+    # Deny access to sensitive files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
 }
 NGINX_EOF
 
@@ -265,7 +338,7 @@ systemctl start nginx
 systemctl enable nginx
 systemctl status nginx | head -10
 '"
-echo -e "${GREEN}✅ Nginx configured${NC}"
+echo -e "${GREEN}✅ Nginx configured with PII protection${NC}"
 echo ""
 
 echo -e "${YELLOW}Step 12: Verifying deployment...${NC}"

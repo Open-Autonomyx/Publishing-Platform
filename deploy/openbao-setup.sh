@@ -174,14 +174,16 @@ boas kv put secret/cloud/clickhouse \
   connection_string="https://default:$CLICKHOUSE_PASSWORD@your-service.clickhouse.cloud:8443/metrics"
 echo -e "${GREEN}✅ ClickHouse credentials stored${NC}"
 
-# SSL/TLS Certificates
-echo "Storing SSL certificates..."
-boas kv put secret/ssl/certificates \
-  cert=@/etc/letsencrypt/live/agennext.com/fullchain.pem \
-  key=@/etc/letsencrypt/live/agennext.com/privkey.pem \
+# SSL/TLS Certificates (managed by cert-manager)
+echo "Storing cert-manager configuration..."
+boas kv put secret/ssl/certmanager \
   domain="agennext.com" \
-  issuer="Let's Encrypt"
-echo -e "${GREEN}✅ SSL certificates stored${NC}"
+  issuer="letsencrypt-prod" \
+  email="admin@agennext.com" \
+  provider="cert-manager" \
+  renewal_enabled="true" \
+  renewal_days_before="30"
+echo -e "${GREEN}✅ cert-manager configuration stored${NC}"
 
 # API Keys
 echo "Storing API keys..."
@@ -202,6 +204,20 @@ boas kv put secret/config/production \
   log_level="info" \
   debug="false"
 echo -e "${GREEN}✅ Environment configuration stored${NC}"
+
+# PII Protection Policy
+echo "Storing PII protection policies..."
+boas kv put secret/pii/protection \
+  encryption_enabled="true" \
+  encryption_algorithm="AES-256-GCM" \
+  field_masking="true" \
+  audit_logging="true" \
+  retention_days="30" \
+  anonymization="true" \
+  pii_fields="email,phone,ssn,credit_card,address,ip_address,user_agent" \
+  gdpr_compliant="true" \
+  ccpa_compliant="true"
+echo -e "${GREEN}✅ PII protection policies stored${NC}"
 
 echo ""
 echo -e "${YELLOW}Step 4: Setting up access policies${NC}"

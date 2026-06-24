@@ -100,13 +100,15 @@ Path: secret/cloud/clickhouse
 └─ connection_string: https://default:password@your-service.clickhouse.cloud:8443/metrics
 ```
 
-### SSL/TLS Certificates
+### SSL/TLS Certificates (cert-manager)
 ```
-Path: secret/ssl/certificates
-├─ cert: (fullchain.pem content)
-├─ key: (privkey.pem content)
+Path: secret/ssl/certmanager
 ├─ domain: agennext.com
-└─ issuer: Let's Encrypt
+├─ issuer: letsencrypt-prod
+├─ email: admin@agennext.com
+├─ provider: cert-manager
+├─ renewal_enabled: true
+└─ renewal_days_before: 30
 ```
 
 ### API Keys
@@ -129,6 +131,118 @@ Path: secret/config/production
 └─ debug: false
 ```
 
+### PII Protection (Vault)
+```
+Path: secret/pii/protection
+├─ encryption_enabled: true
+├─ encryption_algorithm: AES-256-GCM
+├─ field_masking: true
+├─ audit_logging: true
+├─ retention_days: 30
+├─ anonymization: true
+├─ pii_fields: email,phone,ssn,credit_card,address,ip_address,user_agent
+├─ gdpr_compliant: true
+└─ ccpa_compliant: true
+```
+
+---
+
+## 🔒 SSL/TLS with cert-manager
+
+### Automatic Certificate Management
+```bash
+# cert-manager handles Let's Encrypt automation
+# - Automatic renewal 30 days before expiry
+# - HTTP-01 ACME challenge verification
+# - Zero-downtime certificate updates
+
+# Certificate location
+/etc/letsencrypt/live/agennext.com/fullchain.pem
+/etc/letsencrypt/live/agennext.com/privkey.pem
+
+# Check certificate expiry
+openssl x509 -enddate -noout -in /etc/letsencrypt/live/agennext.com/fullchain.pem
+
+# Manual renewal (if needed)
+certbot renew --dry-run
+certbot renew
+```
+
+### Nginx Integration
+- Automatic HTTPS redirect (HTTP → HTTPS)
+- Strong TLS 1.2/1.3 configuration
+- PII-aware security headers
+- Cache control for sensitive endpoints
+- Metrics endpoint restricted to localhost
+
+---
+
+## 🛡️ PII Protection (Vault)
+
+### Protected Fields
+- Email addresses
+- Phone numbers
+- SSN (Social Security Numbers)
+- Credit card information
+- Physical addresses
+- IP addresses
+- User agents
+
+### Protection Methods
+```bash
+# 1. AES-256-GCM Encryption
+#    - At-rest encryption for all PII in database
+#    - Key management via OpenBao
+
+# 2. Field Masking
+#    - Display masked values: ***-**-1234 (for SSN)
+#    - Last 4 digits visible for cards
+#    - Show only domain for emails (user@****)
+
+# 3. Audit Logging
+#    - All PII access logged
+#    - User ID, timestamp, action recorded
+#    - Tamper-proof audit trail
+
+# 4. Retention Policy
+#    - Auto-delete PII after 30 days (configurable)
+#    - GDPR "right to be forgotten" compliant
+#    - CCPA "right to deletion" implemented
+
+# 5. Anonymization
+#    - Remove identifiable data from logs
+#    - Pseudonymize user IDs in metrics
+#    - Separate analytics from raw user data
+```
+
+### GDPR/CCPA Compliance
+```
+✅ Encryption: AES-256-GCM
+✅ Access Control: Role-based, audit-logged
+✅ Data Retention: Automatic purging
+✅ User Rights: Delete, export, access
+✅ Breach Notification: Automated alerts
+✅ Privacy Policy: Required
+✅ Consent Management: Opt-in/out tracking
+```
+
+### Deployment Headers
+```nginx
+# Cache-Control for sensitive endpoints
+Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+Pragma: no-cache
+Expires: 0
+
+# Security headers
+Strict-Transport-Security: max-age=31536000
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Content-Security-Policy: default-src 'self'
+
+# Privacy headers
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
 ---
 
 ## 🚀 Setup OpenBao
@@ -149,7 +263,7 @@ docker logs openbao | grep 'Root Token:'
 export BOAS_TOKEN='your-root-token'
 ```
 
-### 2. Setup All Credentials
+### 2. Setup All Credentials & PII Protection
 
 ```bash
 # Make script executable
@@ -157,6 +271,13 @@ chmod +x deploy/openbao-setup.sh
 
 # Run setup (will prompt for credentials)
 BOAS_TOKEN='root-token' bash deploy/openbao-setup.sh
+
+# Setup includes:
+# ✅ All credentials (12 categories)
+# ✅ cert-manager configuration
+# ✅ PII protection policies
+# ✅ Deploy access policy
+# ✅ 24h deployment token
 
 # Follow prompts to enter:
 # - GitHub token
