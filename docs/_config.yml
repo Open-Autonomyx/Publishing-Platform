@@ -1,0 +1,66 @@
+# GitHub Pages Configuration for OpenAutonomyX
+
+# Site Settings
+title: OpenAutonomyX
+tagline: "Create once. Publish everywhere. In any language."
+description: "The global creative platform for creators, businesses, and agencies. AI-powered content generation, 50+ languages, 6 social platforms."
+
+url: https://openautonomyx.github.io/original
+baseurl: "/original"
+
+# Social media
+twitter_username: openautonomyx
+github_username: openautonomyx
+
+# Theme
+remote_theme: pages-themes/minimal@v0.2.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Footer Links
+footer_links:
+  - label: "GitHub"
+    url: "https://github.com/openautonomyx/original"
+  - label: "Discord"
+    url: "https://discord.gg/openautonomyx"
+  - label: "Twitter"
+    url: "https://twitter.com/openautonomyx"
+  - label: "Documentation"
+    url: "https://openautonomyx.github.io/original"
+
+# Build settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Exclude from build
+exclude:
+  - .git
+  - .gitignore
+  - .env
+  - node_modules
+  - package.json
+  - src
+  - integrations
+
+# Collections
+collections:
+  - guides
+  - examples
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+
+# CSS & JS
+sass:
+  style: compressed
+
+# SEO
+google_site_verification: ""
