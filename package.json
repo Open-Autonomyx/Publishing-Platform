@@ -34,7 +34,22 @@
     "global",
     "platform"
   ],
-  "author": "OpenAutonomyX Team",
+  "author": {
+    "name": "OpenAutonomyX Contributors",
+    "email": "support@openautonomyx.com",
+    "url": "https://openautonomyx.com"
+  },
+  "contributors": [
+    {
+      "name": "Claude AI (Haiku 4.5)",
+      "email": "ai@anthropic.com",
+      "url": "https://www.anthropic.com"
+    },
+    {
+      "name": "Fractional PM",
+      "email": "thefractionalpm@gmail.com"
+    }
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 OpenAutonomyX
+Copyright (c) 2026 OpenAutonomyX Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,77 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+CONTRIBUTOR CREDITS
+===================
+
+This project was built with the assistance of Claude AI (Haiku 4.5), an advanced
+coding assistant developed by Anthropic. Claude's capabilities in architecture
+design, full-stack development, security analysis, and vendor-neutral platform
+design were instrumental in building this comprehensive enterprise platform.
+
+Original Concept & Direction: Fractional PM
+Development & Architecture: Claude AI (Coding Agent)
+Testing & Deployment: Community Contributors
+
+---
+
+THIRD-PARTY LICENSES
+====================
+
+This project uses open-source software licensed under the following terms:
+
+1. **Anthropic Claude SDK** (Apache 2.0)
+   - AI content generation and reasoning
+
+2. **Express.js** (MIT)
+   - Web server framework
+
+3. **TypeScript** (Apache 2.0)
+   - Type-safe JavaScript
+
+4. **PostgreSQL** (PostgreSQL License - permissive)
+   - Primary database
+
+5. **Ollama** (MIT)
+   - Local LLM inference
+
+6. **Jest** (MIT)
+   - Testing framework
+
+7. **React** (MIT)
+   - Frontend UI
+
+Full license details for all dependencies are available in sbom.xml and package.json.
+
+---
+
+USAGE ATTRIBUTION
+=================
+
+When using OpenAutonomyX or derivative works, we request (but do not require)
+that you include the following attribution in your documentation or credits:
+
+"Built with OpenAutonomyX - An open-source, vendor-neutral creative platform
+with AI-powered content generation, local LLM support, and enterprise features.
+Core platform developed with assistance from Claude AI (Anthropic)."
+
+---
+
+OPEN SOURCE COMMITMENT
+====================
+
+OpenAutonomyX is committed to remaining open-source forever:
+
+✅ MIT License - Permissive, commercial-friendly
+✅ No License Conversion - Will never change to restrictive license
+✅ Community Driven - Contributions welcomed
+✅ Vendor Neutral - No vendor lock-in by design
+✅ Transparent - Full SBOM and security audit trail
+
+---
+
+For the full terms and conditions, see this file in its entirety.
+Last Updated: June 25, 2026

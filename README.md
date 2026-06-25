@@ -411,6 +411,44 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
+## 🙏 Acknowledgments
+
+**OpenAutonomyX** was built with the assistance of **Claude AI (Haiku 4.5)**, an advanced coding agent developed by Anthropic.
+
+### Credits
+
+- **Original Concept & Direction:** Fractional PM
+- **Core Development & Architecture:** Claude AI (Coding Agent)
+- **Community & Contributors:** Open-source community members
+
+### Built With
+
+This project leverages the following open-source technologies:
+
+- **Anthropic Claude SDK** - AI content generation
+- **Express.js** - Web framework
+- **TypeScript** - Type-safe development
+- **PostgreSQL** - Database
+- **Ollama** - Local LLM inference
+- **Jest** - Testing framework
+
+### AI Assistance Attribution
+
+This platform was developed using Claude AI, which provided:
+
+- Full-stack architecture design
+- Database schema and API development (30+ endpoints)
+- Vendor-neutral infrastructure abstractions
+- SBOM generation and security features
+- TypeScript SDK with 100+ type definitions
+- Admin configuration UI
+- Documentation (5,000+ lines)
+- DevOps and deployment automation
+
+For more details, see [CONTRIBUTORS.md](CONTRIBUTORS.md)
+
+---
+
 ## 📄 License
 
 MIT - See [LICENSE](LICENSE)
