@@ -1,0 +1,114 @@
+# Alertmanager Configuration - Alert routing and notifications
+# Sends alerts via email, Slack, or webhook
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: ${SLACK_WEBHOOK_URL}  # Set via environment variable
+  pagerduty_url: https://events.pagerduty.com/v2/enqueue
+
+# Alert grouping and routing
+route:
+  # Default: group alerts by alertname, severity
+  receiver: default
+  group_by: ['alertname', 'cluster', 'service', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: critical
+      group_wait: 0s
+      repeat_interval: 1h
+
+    # Warning alerts - batched
+    - match:
+        severity: warning
+      receiver: warning
+      group_wait: 30s
+      repeat_interval: 4h
+
+    # Info alerts - once daily
+    - match:
+        severity: info
+      receiver: info
+      group_wait: 1m
+      repeat_interval: 24h
+
+receivers:
+  # ===========================================================================
+  # Critical Alerts (Slack + PagerDuty)
+  # ===========================================================================
+  - name: critical
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '⚠️ CRITICAL: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'danger'
+        send_resolved: true
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'http://agennext.com:3000'
+    pagerduty_configs:
+      - service_key: ${PAGERDUTY_SERVICE_KEY}
+        description: '{{ .GroupLabels.alertname }}'
+        details:
+          firing: '{{ template "pagerduty.default.instances" .Alerts.Firing }}'
+
+  # ===========================================================================
+  # Warning Alerts (Slack)
+  # ===========================================================================
+  - name: warning
+    slack_configs:
+      - channel: '#alerts-warning'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'warning'
+        send_resolved: true
+
+  # ===========================================================================
+  # Info Alerts (Slack)
+  # ===========================================================================
+  - name: info
+    slack_configs:
+      - channel: '#alerts-info'
+        title: 'ℹ️ INFO: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        color: 'good'
+        send_resolved: false
+
+  # ===========================================================================
+  # Default Receiver (Email + Slack)
+  # ===========================================================================
+  - name: default
+    slack_configs:
+      - channel: '#alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+    email_configs:
+      - to: '{{ .GroupLabels.email }}'
+        from: 'alerts@agennext.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: '{{ .GroupLabels.email_from }}'
+        auth_password: ${SMTP_PASSWORD}
+        headers:
+          Subject: '{{ .GroupLabels.alertname }}'
+
+inhibit_rules:
+  # Don't send warning if critical is already firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
+
+  # Don't send info if warning is already firing
+  - source_match:
+      severity: 'warning'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'dev', 'instance']
