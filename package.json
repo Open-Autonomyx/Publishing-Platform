@@ -1,15 +1,9 @@
 {
   "name": "openautonomyx",
   "version": "1.0.0",
-  "description": "OpenAutonomyx - Unified Platform & Agents Monorepo",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
-    "start": "cd packages/agents/apps/web && npm install && npm run build && npm run preview || npm run dev",
-    "dev": "cd packages/agents/apps/web && npm run dev",
-    "build": "cd packages/agents/apps/web && npm install && npm run build",
-    "test": "echo 'Tests configured in package apps'"
+    "start": "node server.js",
+    "dev": "node server.js"
   }
 }
