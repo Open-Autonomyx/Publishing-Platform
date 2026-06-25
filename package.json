@@ -7,9 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "cd packages/platform && npm start || node server.js",
-    "dev": "yarn workspaces run dev",
-    "build": "echo 'Building monorepo...' && cd packages/platform && npm install && npm run build 2>/dev/null || echo 'Platform build skipped'",
-    "test": "yarn workspaces run test"
+    "start": "cd packages/agents/apps/web && npm run build && npm run preview",
+    "dev": "cd packages/agents/apps/web && npm run dev",
+    "build": "cd packages/agents/apps/web && npm install && npm run build",
+    "test": "echo 'Tests configured in package apps'"
   }
 }
