@@ -1,141 +1,408 @@
 version: '3.9'
 
 services:
-  # OpenAutonomyX Application
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: openautonomyx-app
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      DATABASE_TYPE: postgresql
-      DATABASE_URL: postgresql://openautonomyx:secure_password@postgres:5432/openautonomyx
-      REDIS_URL: redis://redis:6379
-      LLM_PROVIDER: ollama
-      LLM_MODEL: mistral
-      OLLAMA_API_URL: http://ollama:11434
-      STORAGE_TYPE: local
-      STORAGE_PATH: /data/uploads
-    volumes:
-      - ./data:/data
-      - ./uploads:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - openautonomyx
+  # ==================== INFRASTRUCTURE ====================
 
-  # PostgreSQL Database
+  # PostgreSQL - Main database
   postgres:
     image: postgres:15-alpine
-    container_name: openautonomyx-postgres
+    container_name: pp-postgres
     environment:
-      POSTGRES_USER: openautonomyx
-      POSTGRES_PASSWORD: secure_password
-      POSTGRES_DB: openautonomyx
+      POSTGRES_USER: pp_admin
+      POSTGRES_PASSWORD: secure_password_change_me
+      POSTGRES_DB: publishing_platform
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U openautonomyx -d openautonomyx"]
+      test: ["CMD-SHELL", "pg_isready -U pp_admin -d publishing_platform"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
-      - openautonomyx
+      - pp-network
 
-  # Redis Cache
+  # Redis - Cache & session store
   redis:
     image: redis:7-alpine
-    container_name: openautonomyx-redis
+    container_name: pp-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
     networks:
-      - openautonomyx
+      - pp-network
 
-  # Ollama (Local LLM)
+  # Elasticsearch - Search & analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: pp-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pp-network
+
+  # MinIO - S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    container_name: pp-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/minio_data
+    command: server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pp-network
+
+  # Ollama - Local LLM
   ollama:
     image: ollama/ollama:latest
-    container_name: openautonomyx-ollama
+    container_name: pp-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - OLLAMA_HOST=0.0.0.0:11434
+      OLLAMA_HOST: 0.0.0.0:11434
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
     networks:
-      - openautonomyx
-    # Note: Models need to be pulled manually:
-    # docker exec openautonomyx-ollama ollama pull mistral
+      - pp-network
 
-  # pgAdmin for Database Management (Optional)
+  # ==================== CORE SERVICES ====================
+
+  # Event Bus - Service communication
+  event-bus:
+    build:
+      context: ./services/event-bus
+      dockerfile: Dockerfile
+    container_name: pp-event-bus
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # API Gateway - Central routing
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: pp-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      JWT_SECRET: change_me_in_production
+      EVENT_BUS_URL: http://event-bus:3001
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # ==================== CONTENT SERVICES ====================
+
+  # Content Management
+  content-management:
+    build:
+      context: ./services/content-management
+      dockerfile: Dockerfile
+    container_name: pp-content
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      SERVICE_NAME: content-management
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_URL: http://event-bus:3001
+      JWT_SECRET: change_me_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # Skills Management
+  skills:
+    build:
+      context: ./services/skills
+      dockerfile: Dockerfile
+    container_name: pp-skills
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      SERVICE_NAME: skills
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # Tools Management
+  tools:
+    build:
+      context: ./services/tools
+      dockerfile: Dockerfile
+    container_name: pp-tools
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      SERVICE_NAME: tools
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # ==================== SPECIALIZED SERVICES ====================
+
+  # Analytics
+  analytics:
+    build:
+      context: ./services/analytics
+      dockerfile: Dockerfile
+    container_name: pp-analytics
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      SERVICE_NAME: analytics
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # Optimization/AI
+  optimization:
+    build:
+      context: ./services/optimization
+      dockerfile: Dockerfile
+    container_name: pp-optimization
+    ports:
+      - "3006:3006"
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      SERVICE_NAME: optimization
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      OLLAMA_URL: http://ollama:11434
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # Design/Templates
+  design:
+    build:
+      context: ./services/design
+      dockerfile: Dockerfile
+    container_name: pp-design
+    ports:
+      - "3007:3007"
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      SERVICE_NAME: design
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      MINIO_URL: http://minio:9000
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # Feature Store
+  features:
+    build:
+      context: ./services/features
+      dockerfile: Dockerfile
+    container_name: pp-features
+    ports:
+      - "3008:3008"
+    environment:
+      NODE_ENV: development
+      PORT: 3008
+      SERVICE_NAME: features
+      DATABASE_URL: postgresql://pp_admin:secure_password_change_me@postgres:5432/publishing_platform
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_URL: http://event-bus:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      event-bus:
+        condition: service_started
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # ==================== MONITORING & UTILITIES ====================
+
+  # pgAdmin - Database management
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: openautonomyx-pgadmin
+    container_name: pp-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@openautonomyx.com
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - postgres
-    restart: unless-stopped
     networks:
-      - openautonomyx
+      - pp-network
+    restart: unless-stopped
 
-  # Redis Commander for Cache Inspection (Optional)
+  # Redis Commander - Cache inspection
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: openautonomyx-redis-commander
+    container_name: pp-redis-commander
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      REDIS_HOSTS: local:redis:6379
     ports:
       - "8081:8081"
     depends_on:
       - redis
-    restart: unless-stopped
     networks:
-      - openautonomyx
+      - pp-network
+    restart: unless-stopped
+
+  # Kibana - Elasticsearch UI
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.0.0
+    container_name: pp-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: ""
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - pp-network
+    restart: unless-stopped
+
+  # ==================== DEVELOPMENT TOOLS ====================
+
+  # Mailhog - Email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: pp-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - pp-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-  ollama_data:
+  elasticsearch_data:
     driver: local
-  pgadmin_data:
+  minio_data:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:
-  openautonomyx:
+  pp-network:
     driver: bridge
