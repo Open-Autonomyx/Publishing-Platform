@@ -53,7 +53,8 @@ export type SupportedLanguage =
   | "et"
   | "lt"
   | "lv"
-  | "mk";
+  | "mk"
+  | "zip";
 
 export interface ContentRequest {
   topic: string;
@@ -151,6 +152,7 @@ export const LANGUAGE_MAP: Record<SupportedLanguage, string> = {
   lt: "Lithuanian",
   lv: "Latvian",
   mk: "Macedonian",
+  zip: "Zipser German",
 };
 
 export class AGINativeLanguageEngine {
@@ -318,6 +320,7 @@ Provide response in this exact JSON format:
       lt: "- Formal register preferred\n- Literary language valued\n- Baltic traditions important",
       lv: "- Direct communication\n- Formal register respected\n- Baltic cultural heritage",
       mk: "- Respectful, warm tone\n- Formal register for professional\n- Balkan cultural references",
+      zip: "- Warm, traditional tone reflecting Carpathian German heritage\n- Formal register respected in community contexts\n- References to regional customs and craft traditions valued",
     };
 
     return guidelines[language] || "- Adapt to local communication norms\n- Respect cultural values";
